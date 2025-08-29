@@ -1,0 +1,1 @@
+# Core navigation discovery logic
