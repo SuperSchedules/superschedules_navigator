@@ -5,11 +5,32 @@ import os
 import sys
 import subprocess
 from typing import Dict, List
+import pytest
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.llm_link_finder import LLMLinkFinder
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama is available and accessible."""
+    try:
+        result = subprocess.run(
+            ['ollama', 'list'],
+            capture_output=True,
+            timeout=5
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+# Skip all tests in this class if Ollama is not available
+pytestmark = pytest.mark.skipif(
+    not is_ollama_available(),
+    reason="Ollama not available - skipping integration tests"
+)
 
 
 def call_ollama(model: str, prompt: str) -> str:
