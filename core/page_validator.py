@@ -239,7 +239,7 @@ class EventPageValidator:
             return True  # Calendar widgets strongly suggest events
         
         # Multiple weak indicators can add up
-        if score >= 8.0:  # High overall score
+        if score >= 7.5:  # High overall score
             return True
         
         # Must have both content indicators AND temporal patterns
