@@ -60,3 +60,5 @@ Thumbs.db
 
 # API keys and secrets
 .secret_keys
+# Screenshots from discovery
+screenshots/

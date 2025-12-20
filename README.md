@@ -1,115 +1,167 @@
 # Superschedules Navigator
 
-A focused service for discovering event pages and navigation patterns on websites. Works with the superschedules_collector to provide efficient two-stage event scraping.
+Event source discovery tool for the Superschedules ecosystem. Finds websites with event calendars using vision-based classification.
 
-## Purpose
+## What It Does
 
-Instead of rediscovering site structure on every scrape, the navigator finds event-related URLs once and caches the navigation strategy. The collector then uses this information for efficient periodic extraction.
+1. **Search** - Queries DuckDuckGo for event pages (libraries, parks, town halls, universities, museums)
+2. **Screenshot** - Captures each result with Playwright
+3. **Classify** - Uses vision LLM (Ollama) to determine if the page has events
+4. **Store** - Saves results to PostgreSQL database
+5. **Push** - Submits verified URLs to the main Superschedules API for scraping
 
-## Architecture
-
-```
-Website → Navigator (discovers event pages) → Django (stores patterns) → Collector (extracts events)
-```
-
-## API
-
-### POST /discover
-
-**Input:** Website URL + optional hints
-**Output:** Event URLs, navigation patterns, and filtering strategies
-
-```json
-{
-  "base_url": "https://library.org",
-  "target_schema": {
-    "type": "events", 
-    "required_fields": ["title", "date", "location"],
-    "content_indicators": ["calendar", "event", "workshop"]
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "site_profile": {
-    "domain": "library.org",
-    "event_urls": [
-      "https://library.org/events/upcoming",
-      "https://library.org/calendar/2025"
-    ],
-    "url_patterns": [
-      "/events/{category}",
-      "/calendar/{year}/{month}"
-    ],
-    "navigation_strategy": {
-      "pagination_type": "next_button",
-      "pagination_selector": ".next-page",
-      "items_per_page": 20
-    },
-    "discovered_filters": {
-      "date_range": "?start_date={date}",
-      "category": "?type={category}",
-      "location": "?venue={venue}"
-    },
-    "skip_patterns": [
-      "/about",
-      "/staff", 
-      "/policies"
-    ]
-  },
-  "confidence": 0.85,
-  "processing_time_seconds": 3.2
-}
-```
-
-## Use Cases
-
-1. **Library/University Events**: Navigate complex site hierarchies to find calendar sections
-2. **Municipality Events**: Discover city calendar pages and event categories  
-3. **Organization Events**: Find event listings within larger organizational websites
-
-## Integration with Django Backend
-
-Django stores navigation profiles and uses them for efficient periodic scraping:
-
-```python
-# Navigate once per week
-profile = navigator.discover("https://library.org")
-django.store_navigation_profile(profile)
-
-# Extract daily using cached patterns  
-for url in profile.event_urls:
-    events = collector.extract(url)
-    django.store_events(events)
-```
-
-## Benefits
-
-- **Efficiency**: Navigate once, extract many times
-- **Focus**: Each service has a single clear responsibility
-- **Scalability**: Navigation and extraction can be scaled independently  
-- **Reliability**: Cached navigation patterns reduce failure points
-
-## Development
+## Quick Start
 
 ```bash
-# Install dependencies
+# Setup
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+playwright install chromium
 
-# Run development server
-python start_api.py
+# Environment
+cp .env.example .env
+# Edit .env and add your API token
 
-# Run tests
-pytest tests/
+# Database
+createdb navigator
+python manage.py migrate
+python manage.py createsuperuser
 
-# Production server
-python start_api.py --prod
+# Run admin
+python manage.py runserver
+# Visit http://localhost:8000/admin/
 ```
 
-## Environment Variables
+## Requirements
 
-- `OPENAI_API_KEY`: For LLM-powered site analysis
-- `API_PORT`: Server port (default: 8002)
+- Python 3.11+
+- PostgreSQL
+- Ollama with vision model: `ollama pull minicpm-v`
+
+## Management Commands
+
+### Import Targets
+
+```bash
+# Import towns from CSV
+python manage.py import_csv cities.csv --type town
+
+# Import universities
+python manage.py import_csv universities.csv --type university
+
+# Import museums
+python manage.py import_csv museums.csv --type museum --location "Boston, MA"
+
+# Dry run to preview
+python manage.py import_csv data.csv --type museum --dry-run
+```
+
+### Run Discovery
+
+```bash
+# Discover all pending targets
+python manage.py discover
+
+# Discover specific type
+python manage.py discover --type museum
+python manage.py discover --type university
+
+# Discover specific target
+python manage.py discover --target "Harvard"
+
+# Limit number of targets
+python manage.py discover --limit 10
+
+# Dry run
+python manage.py discover --dry-run
+
+# Use different vision model
+python manage.py discover --model llava
+```
+
+### Push to API
+
+```bash
+# See what would be pushed
+python manage.py push --dry-run
+
+# Push all verified event sources
+python manage.py push
+
+# Push by type
+python manage.py push --type museum
+
+# Push specific target
+python manage.py push --target "MIT"
+
+# Re-push already pushed URLs
+python manage.py push --include-pushed
+```
+
+### Statistics
+
+```bash
+python manage.py stats
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+# Required for pushing to API
+SUPERSCHEDULES_API_TOKEN=your-token-here
+
+# Optional
+SUPERSCHEDULES_API_URL=https://api.eventzombie.com
+VISION_MODEL=minicpm-v
+OLLAMA_URL=http://localhost:11434
+```
+
+## Target Types
+
+| Type | Example | What it searches for |
+|------|---------|---------------------|
+| `town` | Newton, MA | Libraries, parks, town hall, community events |
+| `university` | MIT | Student activities, arts, campus events |
+| `museum` | MFA Boston | Exhibitions, programs, tours |
+| `library` | Boston Public Library | Events, programs, workshops |
+| `venue` | TD Garden | Concerts, sports, shows |
+
+## Project Structure
+
+```
+├── manage.py              # Django CLI
+├── config/                # Django settings
+├── navigator/             # Main app
+│   ├── models.py          # Target, Discovery models
+│   ├── admin.py           # Admin interface
+│   └── management/commands/
+│       ├── discover.py    # Run discovery
+│       ├── push.py        # Push to API
+│       ├── import_csv.py  # Import targets
+│       ├── import_json.py # Import legacy JSON
+│       └── stats.py       # Show statistics
+├── .env                   # Environment variables (not in git)
+├── .env.example           # Template for .env
+└── requirements.txt
+```
+
+## Admin Interface
+
+Browse targets, discoveries, and statistics at http://localhost:8000/admin/
+
+- **Targets** - View/edit search targets, filter by type and status
+- **Discoveries** - View discovered URLs, filter by has_events, pushed status
+- **Runs** - Track discovery session statistics
+
+## Related Repos
+
+- [superschedules](../superschedules) - Main Django backend
+- [superschedules_collector](../superschedules_collector) - Event extraction
+- [superschedules_frontend](../superschedules_frontend) - React UI
+
+## License
+
+MIT
