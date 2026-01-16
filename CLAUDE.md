@@ -223,6 +223,39 @@ ollama pull minicpm-v
 
 ## Big Wins
 
+### 2026-01-16: Integrated Text-Based LLM Verification
+
+Added LLM-based validation to filter garbage URLs discovered via web search.
+
+- **Problem**: Web search discovery found many invalid URLs (directories, wrong companies, aggregator sites)
+- **Solution**: Use qwen3:8b model to validate URLs by analyzing page text content
+
+**What was built:**
+1. **Text-based LLM validation** - `validate_with_llm_text()` and `validate_events_page_with_llm()` in services
+2. **VALIDATED/REJECTED statuses** - New status values for `website_status` and `source_status` fields
+3. **validate_urls command** - Batch validation with `--cleanup` flag, `--reverse` for parallel runs
+4. **Category-specific prompts** - Parks accept .gov sites, schools need stricter checks, etc.
+5. **Inline DB saves** - Updates happen immediately, not batched at end (resumable)
+6. **Admin dashboard updates** - Status summary, colored indicators, manual validation actions
+
+**Key improvements:**
+- Temperature set to 0 for consistent results
+- `OLLAMA_NUM_PARALLEL=2` for ~2.6x speedup with parallel jobs
+- Auto-reject events URLs when website domain is invalid
+- Blocklist integration (mblc.state.ma.us, etc.)
+
+**To run validation:**
+```bash
+# Validate websites (can run two in parallel with --reverse)
+python manage.py validate_urls websites --all --cleanup
+python manage.py validate_urls websites --all --cleanup --reverse
+
+# Validate events URLs
+python manage.py validate_urls events --all --cleanup
+```
+
+---
+
 ### 2026-01-13: POI-Based Discovery Architecture
 **Greg really appreciates this work!**
 
