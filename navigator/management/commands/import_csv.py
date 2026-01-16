@@ -48,7 +48,11 @@ class Command(BaseCommand):
             # Try to detect if there's a header
             sample = f.read(1024)
             f.seek(0)
-            has_header = csv.Sniffer().has_header(sample)
+            try:
+                has_header = csv.Sniffer().has_header(sample)
+            except csv.Error:
+                # Single-column CSV, assume first row is header
+                has_header = True
 
             reader = csv.reader(f)
 

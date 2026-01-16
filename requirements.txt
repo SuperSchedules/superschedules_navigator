@@ -8,9 +8,16 @@ python-dotenv>=1.0
 requests>=2.31.0
 beautifulsoup4>=4.12.2
 playwright>=1.40.0
+httpx>=0.27.0
 
-# DuckDuckGo search
-duckduckgo-search>=4.0
+# OSM data extraction (streaming, low memory)
+osmium>=3.7.0
+
+# Reverse geocoding (local, no API calls)
+reverse_geocoder>=1.5
+
+# DuckDuckGo search (renamed from duckduckgo-search)
+ddgs>=7.0
 
 # Testing
 pytest>=7.4.3

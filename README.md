@@ -38,6 +38,7 @@ python manage.py runserver
 - Python 3.11+
 - PostgreSQL
 - Ollama with vision model: `ollama pull minicpm-v`
+- osmium (for streaming POI extraction from OpenStreetMap)
 
 ## Management Commands
 
@@ -105,6 +106,92 @@ python manage.py push --include-pushed
 python manage.py stats
 ```
 
+## POI/Venue Discovery Pipeline
+
+Extract venues from OpenStreetMap and sync them to the backend. This creates venues independently of events, enabling search suggestions even without event calendars.
+
+### Step 1: Extract POIs from OpenStreetMap
+
+```bash
+# Download the PBF file first
+wget https://download.geofabrik.de/north-america/us/massachusetts-latest.osm.pbf
+
+# Extract all POIs from the PBF file
+python manage.py poi_extract --pbf massachusetts-latest.osm.pbf
+
+# Extract specific categories only
+python manage.py poi_extract --pbf massachusetts-latest.osm.pbf --category library --category museum
+
+# Dry run (preview only)
+python manage.py poi_extract --pbf massachusetts-latest.osm.pbf --dry-run
+```
+
+### Step 2: Sync Venues to Backend API
+
+```bash
+# Sync all pending POIs to backend as Venues
+python manage.py poi_sync
+
+# Sync specific category
+python manage.py poi_sync --category library
+
+# Sync specific city
+python manage.py poi_sync --city Needham
+
+# Re-sync already synced (update data)
+python manage.py poi_sync --resync
+
+# Limit batch size
+python manage.py poi_sync --limit 100
+
+# Dry run
+python manage.py poi_sync --dry-run
+```
+
+### Step 3: Discover Event Pages
+
+```bash
+# Discover event pages for synced POIs
+python manage.py poi_discover
+
+# Specific categories (skip parks, etc.)
+python manage.py poi_discover --category library --category museum
+
+# Only POIs with OSM website (faster)
+python manage.py poi_discover --has-website
+
+# Also push discovered sources to backend
+python manage.py poi_discover --push-sources
+
+# Limit and rate-limit
+python manage.py poi_discover --limit 50 --delay 2.0
+
+# Dry run
+python manage.py poi_discover --dry-run
+```
+
+### Step 4: Check POI Statistics
+
+```bash
+python manage.py poi_stats
+```
+
+### Typical POI Workflow
+
+```bash
+# 1. Download OSM data
+wget https://download.geofabrik.de/north-america/us/massachusetts-latest.osm.pbf
+
+# 2. Extract libraries and museums
+python manage.py poi_extract --pbf massachusetts-latest.osm.pbf --category library --category museum
+
+# 3. Sync to backend (requires SUPERSCHEDULES_API_TOKEN in .env)
+python manage.py poi_sync
+
+# 4. Find event pages and create sources
+python manage.py poi_discover --has-website --push-sources
+```
+
 ## Configuration
 
 Copy `.env.example` to `.env` and configure:
@@ -135,14 +222,19 @@ OLLAMA_URL=http://localhost:11434
 ├── manage.py              # Django CLI
 ├── config/                # Django settings
 ├── navigator/             # Main app
-│   ├── models.py          # Target, Discovery models
+│   ├── models.py          # Target, Discovery, POI models
 │   ├── admin.py           # Admin interface
+│   ├── services/          # OSM extractor, event page finder
 │   └── management/commands/
-│       ├── discover.py    # Run discovery
+│       ├── discover.py    # Run vision-based discovery
 │       ├── push.py        # Push to API
 │       ├── import_csv.py  # Import targets
 │       ├── import_json.py # Import legacy JSON
-│       └── stats.py       # Show statistics
+│       ├── stats.py       # Show statistics
+│       ├── poi_extract.py # Extract POIs from OSM
+│       ├── poi_sync.py    # Sync POIs to backend as Venues
+│       ├── poi_discover.py # Find event pages for POIs
+│       └── poi_stats.py   # POI statistics
 ├── .env                   # Environment variables (not in git)
 ├── .env.example           # Template for .env
 └── requirements.txt
@@ -154,6 +246,7 @@ Browse targets, discoveries, and statistics at http://localhost:8000/admin/
 
 - **Targets** - View/edit search targets, filter by type and status
 - **Discoveries** - View discovered URLs, filter by has_events, pushed status
+- **POIs** - View extracted OpenStreetMap venues, filter by category, sync status
 - **Runs** - Track discovery session statistics
 
 ## Related Repos

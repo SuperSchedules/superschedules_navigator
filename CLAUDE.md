@@ -221,6 +221,46 @@ ollama pull minicpm-v
 .venv/bin/pytest
 ```
 
+## Big Wins
+
+### 2026-01-13: POI-Based Discovery Architecture
+**Greg really appreciates this work!**
+
+Rebuilt the discovery system from the ground up:
+
+- **Problem**: Old web search approach produced garbage (eventbrite, news sites, wrong locations)
+- **Solution**: POI-based discovery using OpenStreetMap data with known websites
+
+**What was built:**
+1. **Streaming OSM extraction** - Switched from pyrosm to osmium for low-memory extraction (~100MB vs 16GB+)
+2. **Django Web Dashboard** - Real-time pipeline monitoring at `http://localhost:8000/`
+3. **Local URL Discovery Worker** - Standalone process that runs continuously, finds event URLs for POIs
+4. **Shared Discoveries** - Multiple POIs can share one Discovery (e.g., all Needham parks → Parks & Rec page)
+5. **Domain Blocklist** - 51 garbage domains filtered out (eventbrite, yelp, etc.)
+6. **Worker Status Tracking** - Dashboard shows worker heartbeat, progress, stats
+
+**Key models added:**
+- `POI.discovery` - FK to Discovery (many-to-one)
+- `WorkerStatus` - Tracks worker heartbeat and stats
+- `BlockedDomain` - Domains to skip during web search
+
+**To run the new system:**
+```bash
+# Extract POIs from OSM
+python manage.py poi_extract --pbf massachusetts-latest.osm.pbf
+
+# Sync venues to backend
+python manage.py poi_sync
+
+# Start URL discovery worker (in separate terminal)
+python local_url_update_worker.py
+
+# Monitor in dashboard
+python manage.py runserver
+```
+
+---
+
 ## For AI Assistants
 
 - **NEVER create files unless absolutely necessary** - Always prefer editing existing files

@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* More prominent Dashboard link */
+    #dashboard-link {
+        background: #417690;
+        color: white !important;
+        padding: 8px 16px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: bold;
+        margin-left: 20px;
+        display: inline-block;
+        font-size: 14px;
+    }
+    #dashboard-link:hover {
+        background: #205067;
+        text-decoration: none;
+    }
+    /* Style the branding area to include dashboard link */
+    #branding {
+        display: flex;
+        align-items: center;
+    }
+</style>
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a>
+</h1>
+<a href="{% url 'navigator:dashboard' %}" id="dashboard-link">View Dashboard</a>
+{% endblock %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}

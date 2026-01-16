@@ -1,0 +1,291 @@
+{% extends 'navigator/base.html' %}
+
+{% block title %}{{ step_title }} - Navigator{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{% url 'navigator:dashboard' %}" class="btn btn-secondary">&larr; Back to Dashboard</a>
+</div>
+
+<div class="card" id="form-section">
+    <h2 class="card-title">{{ step_title }}</h2>
+
+    <form method="post" id="pipeline-form">
+        {% csrf_token %}
+
+        {% if step == 'extract' %}
+        <!-- Extract options -->
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">PBF File</label>
+            <select name="pbf_file" style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">
+                {% for pbf in pbf_files %}
+                <option value="{{ pbf }}">{{ pbf }}</option>
+                {% empty %}
+                <option value="">No PBF files found in project directory</option>
+                {% endfor %}
+            </select>
+            <small style="color: var(--text-secondary);">Download from: download.geofabrik.de/north-america/us/</small>
+        </div>
+        {% endif %}
+
+        {% if step == 'sync' %}
+        <!-- Sync info -->
+        <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+            <strong>{{ total_pending }}</strong> POIs pending sync
+            {% if pending_by_category %}
+            <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                {% for cat in pending_by_category %}
+                {{ cat.category }}: {{ cat.count }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if step == 'discover' %}
+        <!-- Discovery info -->
+        <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+            <strong>{{ synced_with_website }}</strong> synced POIs with websites<br>
+            <strong>{{ not_started }}</strong> not yet checked for event pages
+        </div>
+        {% endif %}
+
+        <!-- Category filter -->
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Categories</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                {% for value, label in categories %}
+                <label style="display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px; cursor: pointer;">
+                    <input type="checkbox" name="categories" value="{{ value }}"
+                           {% if value in 'library,museum,theatre,community_centre' %}checked{% endif %}>
+                    {{ label }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- City filter -->
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">City Filter (optional)</label>
+            <input type="text" name="city" placeholder="e.g., Needham"
+                   style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">
+        </div>
+
+        <!-- Limit -->
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Limit (0 = all)</label>
+            <input type="number" name="limit" value="100" min="0"
+                   style="width: 100%; padding: 0.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;">
+        </div>
+
+        <!-- Dry run -->
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" name="dry_run">
+                <span>Dry run (preview only, no changes)</span>
+            </label>
+        </div>
+
+        <button type="submit" class="btn" id="start-btn">Start {{ step_title }}</button>
+    </form>
+</div>
+
+<!-- Progress section (hidden initially) -->
+<div class="card" id="progress-section" style="display: none; margin-top: 1rem;">
+    <h2 class="card-title">Progress</h2>
+
+    <div class="progress-bar" style="height: 12px;">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+        <span id="progress-text">0%</span>
+        <span id="progress-count">0 / 0</span>
+    </div>
+
+    <div style="margin-top: 1rem;">
+        <strong>Current:</strong> <span id="current-item">Starting...</span>
+    </div>
+
+    <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+        <div>
+            <span class="text-success" id="stat-created">0</span> created
+        </div>
+        <div>
+            <span class="text-info" id="stat-updated">0</span> updated
+        </div>
+        <div>
+            <span class="text-muted" id="stat-unchanged">0</span> unchanged
+        </div>
+        <div>
+            <span class="text-warning" id="stat-failed">0</span> failed
+        </div>
+    </div>
+
+    <!-- Log output -->
+    <div style="margin-top: 1rem;">
+        <label style="color: var(--text-secondary);">Log</label>
+        <div id="log-output" style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.75rem; white-space: pre-wrap;"></div>
+    </div>
+
+    <div style="margin-top: 1rem;" id="action-buttons">
+        <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+    </div>
+</div>
+
+<!-- Completion section (hidden initially) -->
+<div class="card" id="complete-section" style="display: none; margin-top: 1rem;">
+    <h2 class="card-title" id="complete-title">Complete</h2>
+    <p id="complete-message"></p>
+    <div style="margin-top: 1rem;">
+        <a href="{% url 'navigator:dashboard' %}" class="btn">Back to Dashboard</a>
+        <button type="button" class="btn btn-secondary" onclick="location.reload()">Run Again</button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const form = document.getElementById('pipeline-form');
+    const formSection = document.getElementById('form-section');
+    const progressSection = document.getElementById('progress-section');
+    const completeSection = document.getElementById('complete-section');
+    const startBtn = document.getElementById('start-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+
+    let runId = null;
+    let pollInterval = null;
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        startBtn.disabled = true;
+        startBtn.textContent = 'Starting...';
+
+        try {
+            const formData = new FormData(form);
+            const response = await fetch(form.action || window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                alert(data.error);
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start {{ step_title }}';
+                return;
+            }
+
+            runId = data.run_id;
+
+            // Show progress section
+            formSection.style.display = 'none';
+            progressSection.style.display = 'block';
+
+            // Start polling
+            pollInterval = setInterval(pollProgress, 1000);
+            pollProgress();  // Immediate first poll
+
+        } catch (err) {
+            console.error('Error starting run:', err);
+            alert('Error starting pipeline: ' + err.message);
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start {{ step_title }}';
+        }
+    });
+
+    cancelBtn.addEventListener('click', async function() {
+        if (!runId) return;
+
+        try {
+            await fetch(`/run/${runId}/cancel/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            cancelBtn.textContent = 'Cancelling...';
+            cancelBtn.disabled = true;
+        } catch (err) {
+            console.error('Error cancelling:', err);
+        }
+    });
+
+    async function pollProgress() {
+        if (!runId) return;
+
+        try {
+            const response = await fetch(`/run/${runId}/progress/`);
+            const data = await response.json();
+
+            // Update progress bar
+            document.getElementById('progress-fill').style.width = data.progress_pct + '%';
+            document.getElementById('progress-text').textContent = data.progress_pct + '%';
+            document.getElementById('progress-count').textContent =
+                data.processed_items + ' / ' + (data.total_items || '?');
+
+            // Update current item
+            document.getElementById('current-item').textContent =
+                data.current_item || (data.is_running ? 'Processing...' : '-');
+
+            // Update stats
+            document.getElementById('stat-created').textContent = data.created || 0;
+            document.getElementById('stat-updated').textContent = data.updated || 0;
+            document.getElementById('stat-unchanged').textContent = data.unchanged || 0;
+            document.getElementById('stat-failed').textContent = data.failed || 0;
+
+            // Update log
+            const logOutput = document.getElementById('log-output');
+            if (data.log) {
+                logOutput.textContent = data.log;
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+
+            // Check if complete
+            if (data.is_complete) {
+                clearInterval(pollInterval);
+                showComplete(data);
+            }
+
+        } catch (err) {
+            console.error('Error polling progress:', err);
+        }
+    }
+
+    function showComplete(data) {
+        progressSection.style.display = 'none';
+        completeSection.style.display = 'block';
+
+        const title = document.getElementById('complete-title');
+        const message = document.getElementById('complete-message');
+
+        if (data.status === 'completed') {
+            title.textContent = 'Completed Successfully';
+            title.className = 'card-title text-success';
+            message.innerHTML = `
+                <strong>Results:</strong><br>
+                Created: ${data.created}<br>
+                Updated: ${data.updated}<br>
+                Unchanged: ${data.unchanged}<br>
+                Failed: ${data.failed}
+            `;
+        } else if (data.status === 'failed') {
+            title.textContent = 'Failed';
+            title.className = 'card-title text-warning';
+            message.textContent = 'Check the log for error details.';
+        } else if (data.status === 'cancelled') {
+            title.textContent = 'Cancelled';
+            title.className = 'card-title text-muted';
+            message.textContent = 'Pipeline was cancelled.';
+        }
+    }
+})();
+</script>
+{% endblock %}

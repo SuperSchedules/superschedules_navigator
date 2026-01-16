@@ -1,0 +1,88 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<div style="background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #dee2e6;">
+    <h3 style="margin-top: 0; margin-bottom: 15px;">POI Status Summary</h3>
+
+    <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+        <!-- Website Status -->
+        <div>
+            <strong>Website Status</strong>
+            <table style="margin-top: 8px; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: green;">&#10004;</span> OSM Website:
+                    </td>
+                    <td style="text-align: right; font-weight: bold;">{{ poi_stats.osm_website }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: green;">&#10004;</span> Validated:
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: green;">{{ poi_stats.website_validated }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: blue;">?</span> Found (needs validation):
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: blue;">{{ poi_stats.website_found }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: red;">&#10008;</span> Rejected:
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: red;">{{ poi_stats.website_rejected }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: orange;">-</span> Not Found:
+                    </td>
+                    <td style="text-align: right; color: #666;">{{ poi_stats.website_not_found }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Events URL Status -->
+        <div>
+            <strong>Events URL Status</strong>
+            <table style="margin-top: 8px; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: green;">&#10004;</span> Validated:
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: green;">{{ poi_stats.source_validated }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: blue;">?</span> Discovered (needs validation):
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: blue;">{{ poi_stats.source_discovered }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: red;">&#10008;</span> Rejected:
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: red;">{{ poi_stats.source_rejected }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 10px 2px 0;">
+                        <span style="color: #999;">&#9675;</span> No Events Found:
+                    </td>
+                    <td style="text-align: right; color: #666;">{{ poi_stats.source_no_events }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Total -->
+        <div>
+            <strong>Total POIs</strong>
+            <div style="margin-top: 8px; font-size: 24px; font-weight: bold;">
+                {{ poi_stats.total }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

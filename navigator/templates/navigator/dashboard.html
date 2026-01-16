@@ -1,0 +1,254 @@
+{% extends 'navigator/base.html' %}
+
+{% block title %}Dashboard - Navigator{% endblock %}
+
+{% block content %}
+<!-- Work Queue -->
+<div class="card" style="margin-bottom: 1rem;">
+    <h2 class="card-title">Work Queue</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 8px; border-left: 3px solid var(--info);">
+            <div style="font-size: 2rem; font-weight: 600; color: var(--info);">{{ queue_events|default:0 }}</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Event URLs to find</div>
+            {% if queue_by_category %}
+            <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                {% for cat in queue_by_category %}
+                {{ cat.category }}: {{ cat.count }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 8px; border-left: 3px solid var(--warning);">
+            <div style="font-size: 2rem; font-weight: 600; color: var(--warning);">{{ queue_website|default:0 }}</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Websites to discover</div>
+        </div>
+        <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 8px; border-left: 3px solid var(--success);">
+            <div style="font-size: 2rem; font-weight: 600; color: var(--success);">{{ queue_sync|default:0 }}</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Venues to sync</div>
+        </div>
+    </div>
+    <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+        {{ schools_skipped|default:0 }} schools excluded from processing
+    </div>
+</div>
+
+<div class="grid">
+    <!-- POI Extraction Card -->
+    <div class="card">
+        <h2 class="card-title">POI Extraction</h2>
+        <div class="stat-value">{{ poi_total|default:0 }}</div>
+        <div class="stat-label">Total POIs extracted</div>
+        <div class="stat-row">
+            <span class="text-muted">With website:</span>
+            <span>{{ poi_with_website|default:0 }} ({{ website_pct }}%)</span>
+        </div>
+        <div style="margin-top: 1rem;">
+            <a href="{% url 'navigator:run_extract' %}" class="btn">Run Extract</a>
+        </div>
+    </div>
+
+    <!-- Venue Sync Card -->
+    <div class="card">
+        <h2 class="card-title">Venue Sync</h2>
+        <div class="stat-value text-success">{{ venue_synced|default:0 }}</div>
+        <div class="stat-label">Synced to backend</div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ venue_sync_pct }}%"></div>
+        </div>
+        <div class="stat-row">
+            <span class="text-muted">Pending:</span>
+            <span>{{ venue_pending|default:0 }}</span>
+        </div>
+        <div class="stat-row">
+            <span class="text-muted">Failed:</span>
+            <span class="{% if venue_failed > 0 %}text-warning{% endif %}">{{ venue_failed|default:0 }}</span>
+        </div>
+        <div style="margin-top: 1rem;">
+            <a href="{% url 'navigator:run_sync' %}" class="btn">Run Sync</a>
+        </div>
+    </div>
+
+    <!-- Discovery Card (combined website + events) -->
+    <div class="card">
+        <h2 class="card-title">Discovery</h2>
+
+        <!-- Website Discovery -->
+        <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.5rem;">Website Discovery</div>
+            <div class="stat-row">
+                <span class="text-muted">Has OSM:</span>
+                <span>{{ website_has_osm|default:0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="text-muted">Found:</span>
+                <span class="text-success">{{ website_found|default:0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="text-muted">Not found:</span>
+                <span>{{ website_not_found|default:0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="text-muted">Pending:</span>
+                <span>{{ website_pending|default:0 }}</span>
+            </div>
+        </div>
+
+        <!-- Event Discovery -->
+        <div style="padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.5rem;">Event URL Discovery</div>
+            <div class="stat-row">
+                <span class="text-muted">Found:</span>
+                <span class="text-info">{{ source_discovered|default:0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="text-muted">No events:</span>
+                <span>{{ source_no_events|default:0 }}</span>
+            </div>
+            <div class="stat-row">
+                <span class="text-muted">Pending:</span>
+                <span>{{ source_not_started|default:0 }}</span>
+            </div>
+        </div>
+
+        {% if discovery_ready > 0 %}
+        <div class="stat-row" style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(96, 165, 250, 0.1); border-radius: 4px;">
+            <span class="text-info"><strong>{{ discovery_ready }}</strong> ready to scan</span>
+        </div>
+        {% endif %}
+
+        <!-- Worker Status -->
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.5rem;">Worker Status</div>
+            {% if worker %}
+                {% if worker.is_alive %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--success);">●</span>
+                    <span>Running</span>
+                    <span class="text-muted" style="font-size: 0.875rem;">
+                        {% if worker.current_phase == 'website' %}
+                        - Finding website for "{{ worker.current_poi_name|default:"..." }}"
+                        {% elif worker.current_phase == 'events' %}
+                        - Finding events for "{{ worker.current_poi_name|default:"..." }}"
+                        {% else %}
+                        - {{ worker.current_poi_name|default:"idle" }}
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="stat-row" style="margin-top: 0.5rem;">
+                    <span class="text-muted">Websites:</span>
+                    <span>{{ worker.websites_found|default:0 }} found, {{ worker.websites_not_found|default:0 }} not found</span>
+                </div>
+                <div class="stat-row">
+                    <span class="text-muted">Events:</span>
+                    <span>{{ worker.discoveries_found|default:0 }} found, {{ worker.discoveries_reused|default:0 }} reused</span>
+                </div>
+                <div class="stat-row">
+                    <span class="text-muted">Rate limit:</span>
+                    <span>{{ worker.sleep_seconds|floatformat:1 }}s delay</span>
+                </div>
+                {% elif worker.is_running %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--warning);">●</span>
+                    <span>Stale</span>
+                    <span class="text-muted" style="font-size: 0.875rem;">- no heartbeat</span>
+                </div>
+                {% else %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--text-secondary);">○</span>
+                    <span class="text-muted">Stopped</span>
+                </div>
+                {% endif %}
+            {% else %}
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: var(--text-secondary);">○</span>
+                <span class="text-muted">Not started</span>
+            </div>
+            {% endif %}
+            <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                Run: <code>python local_url_update_worker.py</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Coverage by Category (full width) -->
+<div class="card" style="margin-top: 1rem;">
+    <h2 class="card-title">Coverage by Category</h2>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th style="text-align: right">Total</th>
+                    <th style="text-align: right">Website</th>
+                    <th style="text-align: right">Synced</th>
+                    <th style="text-align: right">Event URLs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stat in category_stats %}
+                <tr>
+                    <td>{{ stat.category }}</td>
+                    <td style="text-align: right">{{ stat.total }}</td>
+                    <td style="text-align: right" class="text-muted">{{ stat.with_website }}</td>
+                    <td style="text-align: right" class="text-success">{{ stat.synced }}</td>
+                    <td style="text-align: right" class="text-info">{{ stat.discovered }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-muted">No POIs extracted yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="card" style="margin-top: 1rem;">
+    <h2 class="card-title">Recent Pipeline Runs</h2>
+    {% if recent_runs %}
+    <table>
+        <thead>
+            <tr>
+                <th>Step</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Results</th>
+                <th>Started</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in recent_runs %}
+            <tr>
+                <td>{{ run.get_step_display }}</td>
+                <td>
+                    {% if run.status == 'completed' %}
+                    <span class="text-success">Completed</span>
+                    {% elif run.status == 'running' %}
+                    <span class="text-info">Running</span>
+                    {% elif run.status == 'failed' %}
+                    <span class="text-warning">Failed</span>
+                    {% else %}
+                    <span class="text-muted">{{ run.get_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ run.processed_items }}/{{ run.total_items }}</td>
+                <td class="text-muted">
+                    {% if run.created %}+{{ run.created }}{% endif %}
+                    {% if run.updated %}~{{ run.updated }}{% endif %}
+                    {% if run.failed %}<span class="text-warning">!{{ run.failed }}</span>{% endif %}
+                </td>
+                <td class="text-muted">{{ run.started_at|date:"M d, H:i"|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="activity-item">
+        <div class="activity-dot"></div>
+        <span class="text-muted">No pipeline runs yet. Run an extraction to get started.</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

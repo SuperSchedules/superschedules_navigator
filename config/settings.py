@@ -93,6 +93,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Authentication
+LOGIN_URL = '/admin/login/'
+
 # Navigator-specific settings
 VISION_MODEL = os.environ.get('VISION_MODEL', 'minicpm-v')
 OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
