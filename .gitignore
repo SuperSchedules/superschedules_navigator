@@ -62,3 +62,5 @@ Thumbs.db
 .secret_keys
 # Screenshots from discovery
 screenshots/
+*.pbf
+*.osm.pbf

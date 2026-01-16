@@ -105,9 +105,20 @@ class Command(BaseCommand):
                 domain = urlparse(url).netloc.lower()
                 progress.update(task, description=f"[dim]{poi.category:12}[/dim] {poi.name[:30]}")
 
+                # Mark as PROCESSING to avoid contention with other workers
+                updated = POI.objects.filter(id=poi.id, website_status=POI.WebsiteStatus.FOUND).update(
+                    website_status=POI.WebsiteStatus.PROCESSING
+                )
+                if not updated:
+                    # Another worker grabbed it, skip
+                    progress.advance(task)
+                    continue
+
                 html = self.fetch_html(url)
                 if not html:
                     results['error'].append((poi, url, "Fetch failed"))
+                    # Reset to FOUND so it can be retried
+                    POI.objects.filter(id=poi.id).update(website_status=POI.WebsiteStatus.FOUND)
                     progress.advance(task)
                     continue
 
@@ -237,9 +248,20 @@ class Command(BaseCommand):
                 domain = urlparse(url).netloc.lower()
                 progress.update(task, description=f"[dim]{poi.category:12}[/dim] {poi.name[:30]}")
 
+                # Mark as PROCESSING to avoid contention with other workers
+                updated = POI.objects.filter(id=poi.id, source_status=POI.SourceStatus.DISCOVERED).update(
+                    source_status=POI.SourceStatus.PROCESSING
+                )
+                if not updated:
+                    # Another worker grabbed it, skip
+                    progress.advance(task)
+                    continue
+
                 html = self.fetch_html(url)
                 if not html:
                     results['error'].append((poi, url, "Fetch failed"))
+                    # Reset to DISCOVERED so it can be retried
+                    POI.objects.filter(id=poi.id).update(source_status=POI.SourceStatus.DISCOVERED)
                     progress.advance(task)
                     continue
 
@@ -253,6 +275,7 @@ class Command(BaseCommand):
                             source_status=POI.SourceStatus.VALIDATED,
                             events_url_notes='LLM validated'
                         )
+                        console.print(f"  [green]✓[/green] {poi.name[:30]} [dim](saved)[/dim]")
                 else:
                     results['invalid'].append((poi, url, result.get('reason', '')))
                     domain_failures[domain] = domain_failures.get(domain, 0) + 1
@@ -262,6 +285,7 @@ class Command(BaseCommand):
                             source_status=POI.SourceStatus.REJECTED,
                             events_url_notes=f'LLM rejected: {result.get("reason", "")[:100]}'
                         )
+                        console.print(f"  [red]✗[/red] {poi.name[:30]} [dim](saved)[/dim]")
 
                 progress.advance(task)
 
